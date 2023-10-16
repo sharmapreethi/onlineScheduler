@@ -36,7 +36,7 @@ ALL_SLOTS = [
     "20:00:00-21:00:00",
     "21:00:00-22:00:00",
     "22:00:00-23:00:00",
-    "23:00:00-24:00:00",
+    "23:00:00-00:00:00",
 ]
 
 
@@ -129,11 +129,12 @@ class SlotBooking(APIView):
         
         # to check if start time should be end time
         if t1 > t2:
-           return Response(
-            {"sCode": 412, "message": "Start time must be earlier than end time",},
-            status=status.HTTP_412_PRECONDITION_FAILED,
-            ) 
-
+           if not (str(t1.time()) == "23:00:00" and str(t2.time()) == "00:00:00"):
+            return Response(
+                {"sCode": 412, "message": "Start time must be earlier than end time",},
+                status=status.HTTP_412_PRECONDITION_FAILED,
+                )
+        
         # get difference
         delta = t2 - t1
 
@@ -143,8 +144,11 @@ class SlotBooking(APIView):
         min = sec / 60
         print('difference in minutes:', min)
 
+        if str(t1.time()) == "23:00:00" and str(t2.time()) == "00:00:00":
+            min = 60
+
         # to check if the slot that is being booked is for 1 hour
-        if min > 60:
+        if min != 60:
             return Response(
             {"sCode": 422, "message": "Booking should be for max 1 hour",},
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -176,7 +180,7 @@ class SlotBooking(APIView):
         Booking.objects.create(**params)
 
         return Response(
-            {"sCode": 200, "message": "Booking succesfully created"},
+            {"sCode": 200, "message": "Booking succesfully created", "booking_id": booking_id},
             status=status.HTTP_200_OK,
         )
 
@@ -261,6 +265,14 @@ class SlotBooking(APIView):
             status=status.HTTP_404_NOT_FOUND,
         )
 
+        booking_info = booking_info.exclude(status="cancelled")
+
+        if not booking_info:
+            return Response(
+            {"sCode": 404, "message": "Booking doesnot exists",},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
         t1 = datetime.strptime(str(booking_start_time), "%H:%M:%S")
         print('Start time:', t1.time())
 
@@ -269,11 +281,12 @@ class SlotBooking(APIView):
 
         # check if start time is before end time 
         if t1 > t2:
-           return Response(
-            {"sCode": 412, "message": "Start time must be earlier than end time",},
-            status=status.HTTP_412_PRECONDITION_FAILED,
-            ) 
-
+           if not (str(t1.time()) == "23:00:00" and str(t2.time()) == "00:00:00"):
+            return Response(
+                {"sCode": 412, "message": "Start time must be earlier than end time",},
+                status=status.HTTP_412_PRECONDITION_FAILED,
+                ) 
+        
         # get difference
         delta = t2 - t1
 
@@ -283,10 +296,13 @@ class SlotBooking(APIView):
         min = sec / 60
         print('difference in minutes:', min)
 
+        if str(t1.time()) == "23:00:00" and str(t2.time()) == "00:00:00":
+            min = 60
+
         # check if the slot is for 1 hour
-        if min > 60:
+        if min != 60:
             return Response(
-            {"sCode": 422, "message": "Booking should be for max 1 hour",},
+            {"sCode": 422, "message": "Booking should be for 1 hour",},
             status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
@@ -383,7 +399,7 @@ class SlotBooking(APIView):
 
         # check if operator exists in DB
 
-        operator_info = Operator.objects.get(operator_id=operator_id)
+        operator_info = Operator.objects.get(id=operator_id)
 
         if not operator_info:
             return Response(
@@ -413,6 +429,8 @@ class SlotBooking(APIView):
                     slots.append(str(start_time) + "-" + str(end_time))
                     start_time = start_time_i
                 end_time = end_time_i
+            if end_time == "00:00:00":
+                end_time = "24:00:00"
             slots.append(str(start_time) + "-" + str(end_time))
         else:
             slots = booked_slots
@@ -543,7 +561,7 @@ class AddOperator(APIView):
         Operator.objects.create(**params)
 
         return Response(
-            {"sCode": 200, "message": "Operator succesfully added in DB"},
+            {"sCode": 200, "message": "Operator succesfully added in DB", "operator_id": operator_id},
             status=status.HTTP_200_OK,
         )
 
